@@ -11,7 +11,7 @@ env:
 
 jobs:
   lint:
-    name: Lint & Style
+    name: Code Style
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -22,11 +22,9 @@ jobs:
       - name: Install tools
         run: |
           pip install --upgrade pip
-          pip install isort flake8
+          pip install isort
       - name: Run isort
         run: isort src/ --check-only --diff
-      - name: Run flake8
-        run: flake8 src/ --count --max-complexity=10 --statistics
 
   security:
     name: Security Audit

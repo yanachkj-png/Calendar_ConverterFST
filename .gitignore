@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+env/
+venv/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Временные файлы
+*.tmp
+*.log
+*.csv
+!example.csv
+
+# Системные
+Thumbs.db
+.DS_Store
+
+# GitHub
+*.swp
+*.swo

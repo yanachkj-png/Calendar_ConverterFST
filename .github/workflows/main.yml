@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install lint tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort pylint mypy
+      - name: Run isort
+        run: isort . --check-only --diff
+      - name: Run black
+        run: black . --check --diff
+      - name: Run flake8
+        run: flake8 . --count --max-complexity=10 --statistics
+      - name: Run pylint
+        run: pylint convert2.py --fail-under=8.0 || true
+      - name: Run mypy (optional)
+        run: mypy convert2.py --ignore-missing-imports || true
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install security tools
+        run: |
+          pip install bandit pip-audit safety
+      - name: Run bandit
+        run: bandit -r . -ll -f json -o bandit-report.json || true
+      - name: Run pip-audit
+        run: pip-audit --desc --ignore-vuln
+      - name: Run safety (free version)
+        run: safety check --full-report || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  test:
+    name: Unit Tests & Import
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas openpyxl python-calamine pytest
+      - name: Check syntax
+        run: python -m py_compile convert2.py
+      - name: Import module
+        run: python -c "import sys; sys.path.insert(0, '.'); import convert2; assert hasattr(convert2, 'gui_mode')"
+      - name: Run simple function tests (if test file exists)
+        run: |
+          if (Test-Path test_convert.py) { pytest test_convert.py -v } else { echo "No tests found, skipping" }
+        shell: pwsh
+
+  build-exe:
+    name: Build Executable
+    needs: [lint, security, test]
+    runs-on: windows-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas openpyxl python-calamine pyinstaller
+      - name: Build .exe
+        run: |
+          pyinstaller --onefile --windowed --name="CalendarConverter" --hidden-import=calamine convert2.py
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CalendarConverter-${{ github.sha }}
+          path: dist/CalendarConverter.exe
+
+  release:
+    name: Create Release
+    needs: [build-exe]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download built .exe
+        uses: actions/download-artifact@v4
+        with:
+          name: CalendarConverter-${{ github.sha }}
+          path: dist/
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/CalendarConverter.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false

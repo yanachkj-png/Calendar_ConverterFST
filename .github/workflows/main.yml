@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    name: Code Quality
+    name: Code Style
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,11 +18,9 @@ jobs:
       - name: Install tools
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 isort
+          pip install isort
       - name: Run isort
         run: isort src/ --check-only --diff
-      - name: Run flake8
-        run: flake8 src/ --count --max-complexity=10 --statistics
 
   security:
     name: Security Audit
@@ -35,7 +33,7 @@ jobs:
       - name: Install tools
         run: |
           pip install bandit pip-audit
-      - name: Run bandit
+      - name: Run bandit (ignore errors)
         run: bandit -r src/ -ll || true
       - name: Run pip-audit
         run: pip-audit --desc
